@@ -34,7 +34,7 @@
    CONSTANTES VISUALES (COMMUNALYTIC-FIDELITY)
    ====================================================== */
 
-const OUTLIER_COLOR_FADED  = "rgba(40,40,40,0.1)";
+const OUTLIER_COLOR_FADED  = "rgba(40,40,40,0.2)";
 const OUTLIER_COLOR_ACTIVE = "rgba(40,40,40,0.9)";
 
 let highlightedIndex = null;
@@ -43,16 +43,16 @@ let highlightedIndex = null;
    ESTADO INICIAL: OUTLIERS EN GRIS FADED (NO AZUL)
    ====================================================== */
 
-traces.forEach((trace, index) => {
+traces.forEach((trace) => {
   if (trace.type === "scatter3d" && trace.mode === "markers") {
     trace.marker = trace.marker || {};
+    trace.marker.opacity = 1;
 
-    // Outliers (por nombre o por posición 0)
-    if (trace.name === "Outliers" || index === 0) {
+    if (trace.name === "Outliers") {
       trace.marker.color = OUTLIER_COLOR_FADED;
-      trace.marker.opacity = 1;
-    } else {
-      trace.marker.opacity = 1;
+      trace.showlegend = true;
+      trace.visible = true;
+      trace.legendgroup = "outliers";
     }
 
     trace.hovertemplate =
@@ -61,6 +61,7 @@ traces.forEach((trace, index) => {
       `<extra></extra>`;
   }
 });
+
 
 /* ======================================================
    LAYOUT (CON METADATA DEL CLUSTERING)
@@ -129,7 +130,6 @@ const plotDiv = document.getElementById("plot");
 plotDiv.on("plotly_click", function (data) {
   const clickedIndex = data.points[0].curveNumber;
 
-  // Click repetido → reset
   if (highlightedIndex === clickedIndex) {
     highlightedIndex = null;
 
@@ -138,7 +138,6 @@ plotDiv.on("plotly_click", function (data) {
 
       if (trace.name === "Outliers" || i === 0) {
         trace.marker.color = OUTLIER_COLOR_FADED;
-        trace.marker.opacity = 1;
       } else {
         trace.marker.opacity = 1;
       }
@@ -155,19 +154,21 @@ plotDiv.on("plotly_click", function (data) {
           (i === clickedIndex)
             ? OUTLIER_COLOR_ACTIVE
             : OUTLIER_COLOR_FADED;
-        trace.marker.opacity = (i === clickedIndex) ? 1 : 0.3;
       } else {
-        trace.marker.opacity = (i === clickedIndex) ? 0.9 : 0.1;
+        trace.marker.opacity =
+          (i === clickedIndex) ? 0.9 : 0.1;
       }
     });
   }
 
   Plotly.react("plot", traces, layout);
 });
+
 </script>
 
 </body>
 </html>
+
 
 
 
