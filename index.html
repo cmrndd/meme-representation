@@ -34,6 +34,7 @@
  /* ======================================================
    COLORES COMMUNALYTIC
    ====================================================== */
+      legendgroup: "labels"
 
 const OUTLIER_COLOR_FADED  = "rgba(40,40,40,0.2)";
 const OUTLIER_COLOR_ACTIVE = "rgba(40,40,40,0.9)";
@@ -81,12 +82,13 @@ const labelTrace = {
     "Humor situacional de clase"
   ],
   textposition: "top center",
-  textfont: { size: 14, color: "#111" },
+  textfont: { size: 11, color: "#111" },
   hoverinfo: "none",
-  showlegend: false
+  showlegend: false,
+  connectgaps: false
 };
 
-traces.push(labelTrace);
+
 
 /* ======================================================
    LAYOUT
@@ -112,56 +114,93 @@ const layout = {
     zaxis: { showgrid: true, showticklabels: false }
   },
 
-  margin: { l: 0, r: 0, t: 95, b: 0 },
-  showlegend: true
+  margin: { l: 0, r: 0, t: 95, b: 0 }
+  // showlegend removed so only traces with showlegend: true appear
 };
 
 /* ======================================================
    RENDER
    ====================================================== */
 
-Plotly.newPlot("plot", traces, layout, {
+
+// Solo los traces de datos (sin el labelTrace)
+var tracesOnlyData = traces.slice(0, traces.length - 1);
+var plotDiv = document.getElementById("plot");
+var labelTraceIndex = null;
+var baseLabelText = null;
+
+Plotly.newPlot("plot", tracesOnlyData, layout, {
   responsive: true,
   displaylogo: false
+}).then(function() {
+  // agregar labelTrace y guardar su índice
+  Plotly.addTraces(plotDiv, labelTrace).then(function() {
+    labelTraceIndex = plotDiv.data.length - 1;
+    baseLabelText = labelTrace.text.slice();
+    updateLabelTexts();
+  });
 });
 
 /* ======================================================
    HIGHLIGHT POR CLICK (NO AFECTA LABELS)
    ====================================================== */
 
-const plotDiv = document.getElementById("plot");
+// actualizar los textos del labelTrace según la visibilidad/opacidad de cada trace
+function updateLabelTexts() {
+  if (labelTraceIndex === null) return;
+  var data = plotDiv.data;
+  var newText = baseLabelText.map(function(lbl, i) {
+    var tr = data[i];
+    if (!tr) return '';
+    // si el trace está explícitamente oculto, ocultar label
+    if (tr.visible === false) return '';
+    // si tiene marker.opacity y es muy bajo, también ocultar
+    var op = (tr.marker && tr.marker.opacity !== undefined) ? tr.marker.opacity : 1;
+    return (op > 0.4) ? lbl : '';
+  });
+  Plotly.restyle(plotDiv, { text: [newText] }, [labelTraceIndex]);
+}
 
 plotDiv.on("plotly_click", ev => {
-  const idx = ev.points[0].curveNumber;
+  var idx = ev.points[0].curveNumber;
+  // si el click fue en las etiquetas (labelTrace), ignorar
+  if (labelTraceIndex !== null && idx === labelTraceIndex) return;
+
+  var data = plotDiv.data;
 
   if (highlightedIndex === idx) {
     highlightedIndex = null;
-
-    traces.forEach(t => {
-      if (t.marker) t.marker.opacity = 1;
-      if (t.name === "Outliers") t.marker.color = OUTLIER_COLOR_FADED;
-    });
-
+    // restaurar todas las opacidades a 1
+    for (var i = 0; i < data.length; i++) {
+      if (i === labelTraceIndex) continue;
+      if (data[i].marker) {
+        Plotly.restyle(plotDiv, { 'marker.opacity': 1 }, [i]);
+      }
+      if (data[i].name === 'Outliers') {
+        Plotly.restyle(plotDiv, { 'marker.color': OUTLIER_COLOR_FADED }, [i]);
+      }
+    }
   } else {
     highlightedIndex = idx;
-
-    traces.forEach((t, i) => {
-      if (!t.marker) return;
-
-      if (t.name === "Outliers") {
-        t.marker.color = (i === idx)
-          ? OUTLIER_COLOR_ACTIVE
-          : OUTLIER_COLOR_FADED;
+    for (var j = 0; j < data.length; j++) {
+      if (j === labelTraceIndex) continue;
+      if (!data[j].marker) continue;
+      if (j === idx) {
+        Plotly.restyle(plotDiv, { 'marker.opacity': 0.9 }, [j]);
       } else {
-        t.marker.opacity = (i === idx) ? 0.9 : 0.1;
+        Plotly.restyle(plotDiv, { 'marker.opacity': 0.1 }, [j]);
       }
-    });
+      if (data[j].name === 'Outliers') {
+        var col = (j === idx) ? OUTLIER_COLOR_ACTIVE : OUTLIER_COLOR_FADED;
+        Plotly.restyle(plotDiv, { 'marker.color': col }, [j]);
+      }
+    }
   }
 
-  Plotly.react("plot", traces, layout);
+  // actualizar labels según nueva opacidad/visibilidad
+  setTimeout(updateLabelTexts, 50);
 });
 </script>
 
 </body>
 </html>
-
